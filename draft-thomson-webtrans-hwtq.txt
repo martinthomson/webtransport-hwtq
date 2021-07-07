@@ -1,0 +1,306 @@
+
+
+
+
+WEBTRANS                                                      M. Thomson
+Internet-Draft                                                   Mozilla
+Intended status: Informational                               7 July 2021
+Expires: 8 January 2022
+
+
+            Generic HTTP Binding for WebTransport using QUIC
+                   draft-thomson-webtrans-hwtq-latest
+
+Abstract
+
+   The WebTransport API provides an interface to HTTP resources that
+   provides transport-layer capabilities.  This document describes how a
+   subset of the QUIC protocol can be used to provide these transport
+   capabilities.
+
+Discussion Venues
+
+   This note is to be removed before publishing as an RFC.
+
+   Discussion of this document takes place on the WebTransport Working
+   Group mailing list (webtransport@ietf.org), which is archived at
+   https://mailarchive.ietf.org/arch/browse/webtransport/.
+
+   Source for this draft and an issue tracker can be found at
+   https://github.com/martinthomson/webtransport-hwtq.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 8 January 2022.
+
+Copyright Notice
+
+   Copyright (c) 2021 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Simplified BSD License text
+   as described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Simplified BSD License.
+
+Table of Contents
+
+   1.  Introduction
+   2.  Conventions and Definitions
+   3.  Overview
+     3.1.  Open Design Questions
+   4.  Comparison to an HTTP/2-Only Design
+     4.1.  Session Control and Resource Management
+     4.2.  Stream States
+     4.3.  HTTP/1.1
+     4.4.  Additional Framing
+   5.  Security Considerations
+   6.  IANA Considerations
+   7.  Normative References
+   Acknowledgments
+   Author's Address
+
+1.  Introduction
+
+   This document is input to discussion of the design of [WTH2] and --
+   to a lesser extent -- [WTH3].  The author has no intent of pursuing
+   publication of this document, it exists only to provide a more
+   complete exploration of an alternative design.
+
+   This document describes a means of providing a WebTransport-capable
+   mapping to any HTTP version, with a specific goal of providing a TCP-
+   based design that fulfills all of the basic WebTransport
+   requirements.
+
+   The proposed design transplants the design of QUIC streams [QUIC]
+   almost directly, saving specification effort.  This might also save
+   implementation and validation effort through reuse.
+
+2.  Conventions and Definitions
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in
+   BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+3.  Overview
+
+   The WebTransport API depends on three basic functions: bidirectional
+   and unidirectional streams, plus datagrams.  When using a QUIC
+   transport, using native QUIC support for these capabilities ([QUIC],
+   [QD]) provides the best performance.  However, the need to provide a
+   TCP-based protocol means finding a protocol that works with -- at a
+   minimum -- HTTP/2.
+
+   This document proposes that an extended CONNECT [EXT-CONNECT] be used
+   to establish a new connection using a new protocol identifier (with
+   an identifier to be decided).  Using CONNECT results in a
+   bidirectional communications medium with stream characteristics
+   between client and server.
+
+   Once established, this document proposes using a subset of QUIC
+   frames to carry the control messages, stream data, and datagrams.
+   The following frames would be permitted:
+
+   *  PADDING
+
+   *  RESET_STREAM
+
+   *  STOP_SENDING
+
+   *  STREAM (with the 0x02 bit set only)
+
+   *  MAX_DATA
+
+   *  MAX_STREAM_DATA
+
+   *  MAX_STREAMS
+
+   *  DATA_BLOCKED
+
+   *  STREAM_DATA_BLOCKED
+
+   *  STREAMS_BLOCKED
+
+   *  DATAGRAM (0x31 only; from [QD])
+
+   This set of frames is sufficient to carry data for streams of the
+   necessary types.  It also provides a complete set of resource
+   management functions that operate within the scope of the
+   bidirectional WebTransport communication.
+
+   This would use a subset of the stream states in [QUIC].  This ensures
+   that the API is able to present a very similar interface to streams
+   as that provided in QUIC.  Implementations might be simplified
+   slightly as some state transitions are not possible in a context
+   where ordered delivery can be guaranteed.
+
+   Endpoints MUST NOT send stream data that is not contiguous or out of
+   order.  The underlying transport provides reliable, ordered delivery.
+   Implementations will still need to buffer stream data, but the
+   implementation of that buffering does not need to handle gaps in
+   incoming flow.
+
+3.1.  Open Design Questions
+
+   It is not clear whether "connection"-level flow control (the QUIC
+   MAX_DATA frame) is necessary in the context of this integration.  TCP
+   or HTTP/2 flow control mechanisms already exist to control the flow
+   of information on the request and response, which makes the control
+   redundant in some circumstances.  The inclusion is justified by the
+   potential for DATAGRAM frames and other control frames to be
+   exchanged independent of this limit.
+
+   A connection close signal at the level of the WebTransport is
+   possible.  The QUIC application CONNECTION_CLOSE (0x1d) might be used
+   for this purpose.
+
+4.  Comparison to an HTTP/2-Only Design
+
+   The main claim made here is that this design is comparatively simpler
+   than the design in [WTH2].  However, there are other consequences
+   that are worth consideration.  This section attempts to document
+   these more fully.
+
+4.1.  Session Control and Resource Management
+
+   The QUIC binding in [WTH3] is complicated by the need to manage the
+   total number of WebTransport sessions on the one connection.
+   Furthermore, the use of shared resources at the level of the
+   connection (streams especially) means that it is necessary to
+   carefully manage the commitment of resources to a
+
+   [WTH2] has similar constraints on operation.  This proposal avoids
+   using a shared resource for its functions, avoiding that problem.
+   The cost is that sessions are exposed to additional head-of-line
+   blocking performance costs.  As the goal of the protocol is to
+   support TCP-based HTTP versions, the marginal impact of head-of-line
+   blocking is expected to be minimal.
+
+4.2.  Stream States
+
+   [WTH2] describes a design that integrates with the HTTP/2 stream
+   state machine.  This is challenging as it results in the details of
+   the HTTP/2 stream state machine being visible in the API.  In
+   particular, the closing of send and receive parts of HTTP/2 streams
+   are coupled, where they are independent in QUIC.
+
+   As a protocol extension, this difference could be addressed with
+   adjustments to the state machine, but this results in the
+   implementation of an entirely new state management logic, which
+   increases implementation complexity.
+
+   The other way to resolve this discrepancy is to require the same sort
+   of close-state coupling when QUIC is used so that behavior is
+   consistent across different protocol versions.
+
+4.3.  HTTP/1.1
+
+   Though not a hard requirement of the design, the ability to support
+   HTTP/1.1 is an advantage of this design.
+
+   It is also possible to use this design with HTTP/3, albeit with worse
+   performance characteristics than the more complete design of [WTH3].
+   This is offered merely as an observation.
+
+4.4.  Additional Framing
+
+   This proposal adds an additional layer of framing, which increases
+   overheads in HTTP/2.  This is less efficient in terms of overheads
+   than native use of HTTP/2 layer constructs.  This is partially
+   mitigated by the relatively good efficiency of QUIC framing and the
+   potential to send larger frames with the HTTP/2 stream.  The QUIC-
+   derived frames this uses do not need to be limited in size in the
+   same way as those at the HTTP/2 layer.
+
+5.  Security Considerations
+
+   Relatively few of the security considerations of QUIC apply, though a
+   small few are relevant, such as Section 21.6 of [QUIC].
+
+6.  IANA Considerations
+
+   This document has no IANA actions.  Currently.  It might be necessary
+   to work out how the framing layer might be extended in a way that can
+   avoid collisions between frames used in QUIC and this design.  A few
+   options seem plausible:
+
+   *  Register WebTransport extensions in the QUIC registry.  After all,
+      there is tons of space over there.  The main cost there is
+      recording what context each frame type applies to.
+
+   *  Make a clone of the registry for WebTransport that only contains
+      WebTransport frames.  This is relatively simple, but might result
+      in collisions as both protocols independently evolve.
+
+   *  Forego extensibility, at least in the short term, and require a
+      revision or update to the protocol to define new frames or to add
+      the use of a registry.
+
+7.  Normative References
+
+   [EXT-CONNECT]
+              McManus, P., "Bootstrapping WebSockets with HTTP/2",
+              RFC 8441, DOI 10.17487/RFC8441, September 2018,
+              <https://datatracker.ietf.org/doc/html/rfc8441>.
+
+   [QD]       Pauly, T., Kinnear, E., and D. Schinazi, "An Unreliable
+              Datagram Extension to QUIC", Work in Progress, Internet-
+              Draft, draft-ietf-quic-datagram-02, 16 February 2021,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-quic-
+              datagram-02>.
+
+   [QUIC]     Iyengar, J., Ed. and M. Thomson, Ed., "QUIC: A UDP-Based
+              Multiplexed and Secure Transport", RFC 9000,
+              DOI 10.17487/RFC9000, May 2021,
+              <https://datatracker.ietf.org/doc/html/rfc9000>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://datatracker.ietf.org/doc/html/rfc2119>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://datatracker.ietf.org/doc/html/rfc8174>.
+
+   [WTH2]     Frindell, A., Kinnear, E., Pauly, T., Vasiliev, V., and G.
+              Xie, "WebTransport using HTTP/2", Work in Progress,
+              Internet-Draft, draft-ietf-webtrans-http2-00, 3 July 2021,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-
+              webtrans-http2-00>.
+
+   [WTH3]     Vasiliev, V., "WebTransport over HTTP/3", Work in
+              Progress, Internet-Draft, draft-ietf-webtrans-http3-01, 19
+              May 2021, <https://datatracker.ietf.org/doc/html/draft-
+              ietf-webtrans-http3-01>.
+
+Acknowledgments
+
+   Alan Frindell probably doesn't like this proposal all that much, but
+   he at a minimum deserves some credit for it being written down.
+
+Author's Address
+
+   Martin Thomson
+   Mozilla
+
+   Email: mt@lowentropy.net
