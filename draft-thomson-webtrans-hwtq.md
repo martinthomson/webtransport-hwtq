@@ -81,7 +81,7 @@ the control messages, stream data, and datagrams.  The following frames would be
 * DATA_BLOCKED
 * STREAM_DATA_BLOCKED
 * STREAMS_BLOCKED
-* DATAGRAM (from {{!QD=I-D.ietf-quic-datagram}})
+* DATAGRAM (0x31 only; from {{!QD=I-D.ietf-quic-datagram}})
 
 This set of frames is sufficient to carry data for streams of the necessary
 types.  It also provides a complete set of resource management functions that
@@ -160,7 +160,7 @@ offered merely as an observation.
 
 ## Additional Framing
 
-This proposal adds an additional layer framing, which increases overheads in
+This proposal adds an additional layer of framing, which increases overheads in
 HTTP/2.  This is less efficient in terms of overheads than native use of HTTP/2
 layer constructs.  This is partially mitigated by the relatively good efficiency
 of QUIC framing and the potential to send larger frames with the HTTP/2 stream.
@@ -176,7 +176,20 @@ are relevant, such as {{Section 21.6 of QUIC}}.
 
 # IANA Considerations
 
-This document has no IANA actions. actions.
+This document has no IANA actions.  Currently.  It might be necessary to work
+out how the framing layer might be extended in a way that can avoid collisions
+between frames used in QUIC and this design.  A few options seem plausible:
+
+* Register WebTransport extensions in the QUIC registry.  After all, there is
+  tons of space over there.  The main cost there is recording what context each
+  frame type applies to.
+
+* Make a clone of the registry for WebTransport that only contains WebTransport
+  frames.  This is relatively simple, but might result in collisions as both
+  protocols independently evolve.
+
+* Forego extensibility, at least in the short term, and require a revision or
+  update to the protocol to define new frames or to add the use of a registry.
 
 
 --- back
@@ -184,4 +197,5 @@ This document has no IANA actions. actions.
 # Acknowledgments
 {:numbered="false"}
 
-TODO acknowledge someone.
+Alan Frindell probably doesn't like this proposal all that much, but he at a
+minimum deserves some credit for it being written down.
