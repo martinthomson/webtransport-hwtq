@@ -171,7 +171,7 @@ way as those at the HTTP/2 layer.
 # Security Considerations
 
 Relatively few of the security considerations of QUIC apply, though a small few
-do, such as {{Section 21.6 of RFC9000}}.
+are relevant, such as {{Section 21.6 of QUIC}}.
 
 
 # IANA Considerations
