@@ -168,6 +168,18 @@ The QUIC-derived frames this uses do not need to be limited in size in the same
 way as those at the HTTP/2 layer.
 
 
+## RESET_STREAM Redundancies
+
+There is a small bit of redundancy in the RESET_STREAM frame.  With a reliable
+substrate, there is no need to signal the number of bytes that were consumed by
+the stream in a RESET_STREAM frame.  This field could be safely removed, if
+reuse of the QUIC encodings was deemed to be unimportant.
+
+In the current design, endpoints are required to provide an accurate value for
+the Final Size field of RESET_STREAM frames they send and to validate
+the value they received.
+
+
 # Security Considerations
 
 Relatively few of the security considerations of QUIC apply, though a small few
