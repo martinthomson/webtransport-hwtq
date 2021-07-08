@@ -4,8 +4,8 @@
 
 WEBTRANS                                                      M. Thomson
 Internet-Draft                                                   Mozilla
-Intended status: Informational                               7 July 2021
-Expires: 8 January 2022
+Intended status: Informational                               8 July 2021
+Expires: 9 January 2022
 
 
             Generic HTTP Binding for WebTransport using QUIC
@@ -44,7 +44,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 8 January 2022.
+   This Internet-Draft will expire on 9 January 2022.
 
 Copyright Notice
 
@@ -71,6 +71,7 @@ Table of Contents
      4.2.  Stream States
      4.3.  HTTP/1.1
      4.4.  Additional Framing
+     4.5.  RESET_STREAM Redundancies
    5.  Security Considerations
    6.  IANA Considerations
    7.  Normative References
@@ -230,6 +231,18 @@ Table of Contents
    potential to send larger frames with the HTTP/2 stream.  The QUIC-
    derived frames this uses do not need to be limited in size in the
    same way as those at the HTTP/2 layer.
+
+4.5.  RESET_STREAM Redundancies
+
+   There is a small bit of redundancy in the RESET_STREAM frame.  With a
+   reliable substrate, there is no need to signal the number of bytes
+   that were consumed by the stream in a RESET_STREAM frame.  This field
+   could be safely removed, if reuse of the QUIC encodings was deemed to
+   be unimportant.
+
+   In the current design, endpoints are required to provide an accurate
+   value for the Final Size field of RESET_STREAM frames they send and
+   to validate the value they received.
 
 5.  Security Considerations
 
